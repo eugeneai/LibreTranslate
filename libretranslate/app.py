@@ -675,6 +675,43 @@ def create_app(args):
         if text_format not in ["text", "html"]:
             abort(400, description=_("%(format)s format is not supported", format=text_format))
 
+        def procchunk(q):
+            if sentencesplit and not batch: # Join lines into one line, breaking by empty lines
+
+                def senstart(s):
+                    if not s:
+                        return s
+                    c = s[0]
+                    if c.isupper():
+                        return "\n"+s
+                    else:
+                        return s
+
+                def recpar(s):
+                    s = s.replace("\n", " ")
+                    return s
+
+                q = q.split("\n")
+
+                q = [_t.lstrip() for _t in q]
+                q = [senstart(_l) for _l in q]
+                wholetext = "\n".join(q)
+                while True:
+                    nwholetext = wholetext.replace("\n\n\n", "\n\n")
+                    if nwholetext == wholetext:
+                        break
+                    wholetext = nwholetext
+                q = wholetext.split("\n\n")
+                q = [recpar(_t) for _t in q]
+
+                wholetext = "\n\n".join(q)
+
+            return wholetext
+
+        if batch:
+            q = [procchunk(_) for _ in q]
+        else:
+            q = procchunk(q)
         try:
             if batch:
                 batch_results = []
