@@ -420,7 +420,7 @@ def create_app(args):
           api_secret = secret.get_current_secret_js()
         else:
           api_secret = secret.get_bogus_secret_js()
-        
+
       response = Response(render_template("app.js.template",
             url_prefix=args.url_prefix,
             get_api_key_link=args.get_api_key_link,
@@ -531,7 +531,7 @@ def create_app(args):
               default: 0
               example: 3
             required: false
-            description: Preferred number of alternative translations 
+            description: Preferred number of alternative translations
           - in: formData
             name: api_key
             schema:
@@ -595,12 +595,15 @@ def create_app(args):
             target_lang = json.get("target")
             text_format = json.get("format")
             num_alternatives = int(json.get("alternatives", 0))
+            sentencesplit = bool(json.get("sentencesplit", False))
         else:
             q = request.values.get("q")
             source_lang = request.values.get("source")
             target_lang = request.values.get("target")
             text_format = request.values.get("format")
             num_alternatives = request.values.get("alternatives", 0)
+            sentencesplit = request.values.get("sentencesplit", False)
+        print("SS", sentencesplit)
 
         if not q:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='q'))
@@ -608,7 +611,7 @@ def create_app(args):
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='source'))
         if not target_lang:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='target'))
-        
+
         try:
             num_alternatives = max(0, int(num_alternatives))
         except ValueError:
@@ -689,7 +692,7 @@ def create_app(args):
 
                     batch_results.append(translated_text)
                     batch_alternatives.append(alternatives)
-                
+
                 result = {"translatedText": batch_results}
 
                 if source_lang == "auto":
