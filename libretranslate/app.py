@@ -603,9 +603,6 @@ def create_app(args):
             text_format = request.values.get("format")
             num_alternatives = request.values.get("alternatives", 0)
             sentencesplit = request.values.get("sentencesplit", False)
-        print("SS", sentencesplit)
-        from pprint import pprint
-        pprint(dict(request.values))
 
         if not q:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='q'))
