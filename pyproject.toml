@@ -58,7 +58,7 @@ dependencies = [
     "polib ==1.1.1",
     "packaging ==23.1",
     "torch ==2.5.1",
-    "sentence-splitter =1.4"
+    "sentence-splitter ==1.4"
 ]
 
 # pip3 install torch torchvision torchaudio # Default CUDA
