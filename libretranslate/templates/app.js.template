@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     '		target: ' + this.$options.filters.escape(this.targetLang) + ',',
                     '		format: "' + (this.isHtml ? "html" : "text") + '",',
                     '		alternatives: 3,',
+                    '		sentencesplit: ' + this.sentencesplit.toString()+ ',',
                     '		api_key: "' + (localStorage.getItem("api_key") || "") + '"',
                     '	}),',
                     '	headers: { "Content-Type": "application/json" }',
