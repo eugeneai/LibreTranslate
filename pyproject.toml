@@ -57,8 +57,17 @@ dependencies = [
     "prometheus-client ==0.15.0",
     "polib ==1.1.1",
     "packaging ==23.1",
-    "torch ==2.0.1"
+    "torch ==2.5.1",
+    "sentence-splitter =1.4"
 ]
+
+# pip3 install torch torchvision torchaudio # Default CUDA
+
+# pip uninstall nvidia_cublas_cu12 nvidia_cuda_cupti_cu12 nvidia_cuda_nvrtc_cu12 nvidia_cuda_runtime_cu12 nvidia_cudnn_cu12
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.2 # ROCm6.2
+
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu # CPU
+
 
 [project.scripts]
 libretranslate = "libretranslate.main:main"
