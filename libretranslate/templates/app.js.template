@@ -246,6 +246,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     data.append("target", self.targetLang);
                     data.append("format", self.isHtml ? "html" : "text");
                     data.append("alternatives", 3);
+                    data.append("sentencesplit", self.sentencesplit);
                     data.append("api_key", localStorage.getItem("api_key") || "");
                     if (self.apiSecret) data.append("secret", atob(self.apiSecret));
 

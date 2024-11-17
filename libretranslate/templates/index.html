@@ -191,6 +191,13 @@
 										<option :value="option.code">[[ option.name ]]</option>
 									</template>
 								</select>
+								<label for="textarea1" class="sr-only">
+
+								</label>
+                                <label>
+                                  <input type="checkbox" v-model="sentencesplit" name="sentencesplit"/>
+                                  <span>{{ _h("Paragraphs") }}&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                                </label>
 							</div>
 
 							<div class="col s6 language-select">
