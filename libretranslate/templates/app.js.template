@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function(){
             charactersLimit: -1,
 
             detectedLangText: "",
+            sentencesplit: false,
 
             copyTextLabel: {{ _e("Copy text") }},
 
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
             const langsRequest = new XMLHttpRequest();
             langsRequest.open("GET", BaseUrl + "/languages", true);
-            
+
             settingsRequest.onload = function() {
                 if (this.status >= 200 && this.status < 400) {
                     self.settings = JSON.parse(this.response);
