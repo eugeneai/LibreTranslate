@@ -195,7 +195,9 @@
 
 								</label>
                                 <label>
-                                  <input type="checkbox" v-model="sentencesplit" name="sentencesplit"/>
+                                  <input type="checkbox" v-model="sentencesplit"
+                                         @change="handleInput"
+                                         name="sentencesplit"/>
                                   <span>{{ _h("Paragraphs") }}&nbsp;&nbsp;&nbsp;&nbsp;</span>
                                 </label>
 							</div>

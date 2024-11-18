@@ -533,6 +533,14 @@ def create_app(args):
             required: false
             description: Preferred number of alternative translations
           - in: formData
+            name: sentencesplit
+            schema:
+              type: boolean
+              default: false
+              example: true
+            required: false
+            description: Preferred number of alternative translations
+          - in: formData
             name: api_key
             schema:
               type: string
@@ -672,15 +680,22 @@ def create_app(args):
         if text_format not in ["text", "html"]:
             abort(400, description=_("%(format)s format is not supported", format=text_format))
 
-        def procchunk(q):
+        itemflag = [False]   # a List monad, i.e., box
+
+        def procchunk(q, itemflag):
             if sentencesplit and not batch: # Join lines into one line, breaking by empty lines
 
-                def senstart(s):
-                    if not s:
+                def senstart(s, itemflag):
+                    ss = s.strip()
+                    if not ss:
                         return s
-                    c = s[0]
+                    c = ss[0]
                     if c.isupper():
-                        return "\n"+s
+                        return "\n\n"+s
+                    elif ss.startswith(r"\item"):
+                        itemflag[0] = True
+                        print("1111::", itemflag)
+                        return "\n\n"+s.lstrip().replace(r"\item", "---")
                     else:
                         return s
 
@@ -691,7 +706,7 @@ def create_app(args):
                 q = q.split("\n")
 
                 q = [_t.lstrip() for _t in q]
-                q = [senstart(_l) for _l in q]
+                q = [senstart(_l, itemflag) for _l in q]
                 wholetext = "\n".join(q)
                 while True:
                     nwholetext = wholetext.replace("\n\n\n", "\n\n")
@@ -705,10 +720,20 @@ def create_app(args):
 
             return wholetext
 
+        def restateitems(text, itemflag):
+            if itemflag[0]:
+                if text.lstrip().startswith("- "):
+                    text = text.replace("- ", r"\item ", 1)
+                text = text.replace("\n\n- ", "\n\n\\item ")
+                return text
+            else:
+                return text
+
         if batch:
-            q = [procchunk(_) for _ in q]
+            q = [procchunk(_, itemflag) for _ in q]
         else:
-            q = procchunk(q)
+            q = procchunk(q, itemflag)
+        print("itemflag:::", itemflag)
         try:
             if batch:
                 batch_results = []
@@ -726,7 +751,7 @@ def create_app(args):
                         translated_text = unescape(improve_translation_formatting(text, hypotheses[0].value))
                         alternatives = filter_unique([unescape(improve_translation_formatting(text, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
 
-                    batch_results.append(translated_text)
+                    batch_results.append(restateitems(translated_text, itemflag))
                     batch_alternatives.append(alternatives)
 
                 result = {"translatedText": batch_results}
@@ -750,7 +775,7 @@ def create_app(args):
                     translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
                     alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
 
-                result = {"translatedText": translated_text}
+                result = {"translatedText": restateitems(translated_text, itemflag)}
 
                 if source_lang == "auto":
                     result["detectedLanguage"] = detected_src_lang
