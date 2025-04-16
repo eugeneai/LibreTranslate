@@ -22,7 +22,7 @@ from werkzeug.http import http_date
 from werkzeug.utils import secure_filename
 
 from libretranslate import flood, remove_translated_files, scheduler, secret, security, storage
-from libretranslate.language import detect_languages, improve_translation_formatting
+from libretranslate.language import model2iso, iso2model, detect_languages, improve_translation_formatting
 from libretranslate.locales import (
     _,
     _lazy,
@@ -37,6 +37,19 @@ from libretranslate.locales import (
 from .api_keys import Database, RemoteDatabase
 from .suggestions import Database as SuggestionsDatabase
 
+# Rough map of emoji characters
+emojis = {e: True for e in \
+  [ord(' ')] +                    # Spaces
+  list(range(0x1F600,0x1F64F)) +  # Emoticons
+  list(range(0x1F300,0x1F5FF)) +  # Misc Symbols and Pictographs
+  list(range(0x1F680,0x1F6FF)) +  # Transport and Map
+  list(range(0x2600,0x26FF)) +    # Misc symbols
+  list(range(0x2700,0x27BF)) +    # Dingbats
+  list(range(0xFE00,0xFE0F)) +    # Variation Selectors
+  list(range(0x1F900,0x1F9FF)) +  # Supplemental Symbols and Pictographs
+  list(range(0x1F1E6,0x1F1FF)) +  # Flags
+  list(range(0x20D0,0x20FF))      # Combining Diacritical Marks for Symbols
+}
 
 def get_version():
     try:
@@ -153,6 +166,19 @@ def filter_unique(seq, extra):
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
 
+
+def detect_translatable(src_texts):
+  if isinstance(src_texts, list):
+    return any(detect_translatable(t) for t in src_texts)
+  
+  for ch in src_texts:
+    if not (ord(ch) in emojis):
+      return True
+  
+  # All emojis
+  return False
+
+
 def create_app(args):
     from libretranslate.init import boot
 
@@ -230,9 +256,18 @@ def create_app(args):
             return max(req_cost, int(math.ceil(getattr(request, 'duration', 0) / args.req_time_cost)))
           else:
             return req_cost
+        
+        def get_limits_key_func():
+          if args.api_keys:
+            def func():
+              ak = get_req_api_key()
+              return ak if ak else get_remote_address()
+            return func
+          else:
+            return get_remote_address
 
         limiter = Limiter(
-            key_func=get_remote_address,
+            key_func=get_limits_key_func(),
             default_limits=get_routes_limits(
                 args, api_keys_db
             ),
@@ -395,7 +430,7 @@ def create_app(args):
             web_version=os.environ.get("LT_WEB") is not None,
             version=get_version(),
             swagger_url=swagger_url,
-            available_locales=[{'code': l['code'], 'name': _lazy(l['name'])} for l in get_available_locales(not args.debug)],
+            available_locales=sorted([{'code': l['code'], 'name': _lazy(l['name'])} for l in get_available_locales(not args.debug)], key=lambda s: s['name']),
             current_locale=get_locale(),
             alternate_locales=get_alternate_locale_links()
         ))
@@ -464,7 +499,10 @@ def create_app(args):
                       type: string
                     description: Supported target language codes
         """
-        return jsonify([{"code": l.code, "name": _lazy(l.name), "targets": language_pairs.get(l.code, [])} for l in languages])
+        return jsonify([{"code": model2iso(l.code), 
+                         "name": _lazy(l.name), 
+                         "targets": model2iso(language_pairs.get(l.code, []))
+                        } for l in languages])
 
     # Add cors
     @bp.after_request
@@ -599,15 +637,15 @@ def create_app(args):
         if request.is_json:
             json = get_json_dict(request)
             q = json.get("q")
-            source_lang = json.get("source")
-            target_lang = json.get("target")
+            source_lang = iso2model(json.get("source"))
+            target_lang = iso2model(json.get("target"))
             text_format = json.get("format")
             num_alternatives = int(json.get("alternatives", 0))
             sentencesplit = bool(json.get("sentencesplit", False))
         else:
             q = request.values.get("q")
-            source_lang = request.values.get("source")
-            target_lang = request.values.get("target")
+            source_lang = iso2model(request.values.get("source"))
+            target_lang = iso2model(request.values.get("target"))
             text_format = request.values.get("format")
             num_alternatives = request.values.get("alternatives", 0)
             sentencesplit = request.values.get("sentencesplit", False)
@@ -657,13 +695,17 @@ def create_app(args):
 
         if batch:
             request.req_cost = max(1, len(q))
-
-        if source_lang == "auto":
-            candidate_langs = detect_languages(src_texts)
-            detected_src_lang = candidate_langs[0]
+          
+        translatable = detect_translatable(src_texts)
+        if translatable:
+          if source_lang == "auto":
+              candidate_langs = detect_languages(src_texts)
+              detected_src_lang = candidate_langs[0]
+          else:
+              detected_src_lang = {"confidence": 100.0, "language": source_lang}
         else:
-            detected_src_lang = {"confidence": 100.0, "language": source_lang}
-
+          detected_src_lang = {"confidence": 0.0, "language": "en"}
+        
         src_lang = next(iter([l for l in languages if l.code == detected_src_lang["language"]]), None)
 
         if src_lang is None:
@@ -743,9 +785,14 @@ def create_app(args):
                     if translator is None:
                         abort(400, description=_("%(tname)s (%(tcode)s) is not available as a target language from %(sname)s (%(scode)s)", tname=_lazy(tgt_lang.name), tcode=tgt_lang.code, sname=_lazy(src_lang.name), scode=src_lang.code))
 
-                    if text_format == "html":
-                        translated_text = unescape(str(translate_html(translator, text)))
-                        alternatives = [] # Not supported for html yet
+                    if translatable:
+                      if text_format == "html":
+                          translated_text = unescape(str(translate_html(translator, text)))
+                          alternatives = [] # Not supported for html yet
+                      else:
+                          hypotheses = translator.hypotheses(text, num_alternatives + 1)
+                          translated_text = unescape(improve_translation_formatting(text, hypotheses[0].value))
+                          alternatives = filter_unique([unescape(improve_translation_formatting(text, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
                     else:
                         hypotheses = translator.hypotheses(text, num_alternatives + 1)
                         translated_text = unescape(improve_translation_formatting(text, hypotheses[0].value))
@@ -757,7 +804,7 @@ def create_app(args):
                 result = {"translatedText": batch_results}
 
                 if source_lang == "auto":
-                    result["detectedLanguage"] = [detected_src_lang] * len(q)
+                    result["detectedLanguage"] = [model2iso(detected_src_lang)] * len(q)
                 if num_alternatives > 0:
                     result["alternatives"] = batch_alternatives
 
@@ -767,18 +814,30 @@ def create_app(args):
                 if translator is None:
                     abort(400, description=_("%(tname)s (%(tcode)s) is not available as a target language from %(sname)s (%(scode)s)", tname=_lazy(tgt_lang.name), tcode=tgt_lang.code, sname=_lazy(src_lang.name), scode=src_lang.code))
 
-                if text_format == "html":
-                    translated_text = unescape(str(translate_html(translator, q)))
-                    alternatives = [] # Not supported for html yet
+                if translatable:
+                  if text_format == "html":
+                      translated_text = unescape(str(translate_html(translator, q)))
+                      alternatives = [] # Not supported for html yet
+                  else:
+                      hypotheses = translator.hypotheses(q, num_alternatives + 1)
+                      translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
+                      alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
                 else:
+<<<<<<< HEAD
                     hypotheses = translator.hypotheses(q, num_alternatives + 1)
                     translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
                     alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
 
                 result = {"translatedText": restateitems(translated_text, itemflag)}
+=======
+                  translated_text = q # Cannot translate, send the original text back
+                  alternatives = []
+                
+                result = {"translatedText": translated_text}
+>>>>>>> lt/main
 
                 if source_lang == "auto":
-                    result["detectedLanguage"] = detected_src_lang
+                    result["detectedLanguage"] = model2iso(detected_src_lang)
                 if num_alternatives > 0:
                     result["alternatives"] = alternatives
 
@@ -874,8 +933,8 @@ def create_app(args):
         if args.disable_files_translation:
             abort(403, description=_("Files translation are disabled on this server."))
 
-        source_lang = request.form.get("source")
-        target_lang = request.form.get("target")
+        source_lang = iso2model(request.form.get("source"))
+        target_lang = iso2model(request.form.get("target"))
         file = request.files['file']
         char_limit = get_char_limit(args.char_limit, api_keys_db)
 
@@ -1051,7 +1110,7 @@ def create_app(args):
         if not q:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='q'))
 
-        return jsonify(detect_languages(q))
+        return jsonify(model2iso(detect_languages(q)))
 
     @bp.route("/frontend/settings")
     @limiter.exempt
@@ -1197,13 +1256,13 @@ def create_app(args):
             json = get_json_dict(request)
             q = json.get("q")
             s = json.get("s")
-            source_lang = json.get("source")
-            target_lang = json.get("target")
+            source_lang = iso2model(json.get("source"))
+            target_lang = iso2model(json.get("target"))
         else:
             q = request.values.get("q")
             s = request.values.get("s")
-            source_lang = request.values.get("source")
-            target_lang = request.values.get("target")
+            source_lang = iso2model(request.values.get("source"))
+            target_lang = iso2model(request.values.get("target"))
 
         if not q:
             abort(400, description=_("Invalid request: missing %(name)s parameter", name='q'))

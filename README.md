@@ -174,7 +174,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for information on how to build and run
 
 ### CUDA
 
-You can use hardware acceleration to speed up translations on a GPU machine with CUDA 11.2 and [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
+You can use hardware acceleration to speed up translations on a GPU machine with CUDA 12.4.1 and [nvidia-docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
 
 Run this version with:
 
@@ -411,6 +411,7 @@ See it in action on this [page](https://community.libretranslate.com/t/have-you-
 ## Mobile Apps
 
 - [LibreTranslator](https://codeberg.org/BeoCode/LibreTranslator) is an Android app [available on the Play Store](https://play.google.com/store/apps/details?id=de.beowulf.libretranslater) and [in the F-Droid store](https://f-droid.org/packages/de.beowulf.libretranslater/) that uses the LibreTranslate API.
+- [Translate You](https://github.com/you-apps/TranslateYou) is a privacy focused translator app built with MD3 available [in F-Droid Store](https://f-droid.org/packages/com.bnyro.translate/) and uses the LibreTranslate API amongst other providers.
 - [LiTranslate](https://github.com/viktorkalyniuk/LiTranslate-iOS) is an iOS app [available on the App Store](https://apps.apple.com/us/app/litranslate/id1644385339) that uses the LibreTranslate API.
 
 ## Web browser
@@ -425,9 +426,8 @@ This is a list of public LibreTranslate instances, some require an API key. If y
 | URL                                                         | API Key Required   | Links                                                                                                         |
 | ----------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
 | [libretranslate.com](https://libretranslate.com)            | :heavy_check_mark: | [ [Get API Key](https://portal.libretranslate.com) ] [ [Service Status](https://status.libretranslate.com/) ] |
-| [translate.terraprint.co](https://translate.terraprint.co/) | -                  |
-| [trans.zillyhuhn.com](https://trans.zillyhuhn.com/)         | -                  |
-| [translate.lotigara.ru](https://translate.lotigara.ru)      | -                  |
+| [translate.flossboxin.org.in](https://translate.flossboxin.org.in/) |  | [ [Contact/eMail](mailto:dev@flossboxin.org.in) ] |
+| [lt.blitzw.in](https://lt.blitzw.in/) |  |  |
 
 ## TOR/i2p Mirrors
 
@@ -683,6 +683,38 @@ server {
 Add this to an existing NGINX config or save it as `libretranslate` in the `/etc/nginx/site-enabled` directory and run `sudo nginx -s reload`.
 
 </details>
+
+### Can I run it as a systemd (default pip/python installed one)?
+
+Yes, just create a service file in /etc/systemd/system and enable it to run at startup.
+The .env (environmant) file is optional based on your setup.
+Add the below to the file (change to your values as necessary) and name the file as "libretranslate.service)
+
+```javascript
+[Unit]
+Description=LibreTranslate
+After=network.target
+[Service]
+User=root
+Type=idle
+Restart=always
+Environment="PATH=/usr/local/lib/python3.11/dist-packages/libretranslate"
+ExecStart=/usr/bin/python3 /usr/local/bin/libretranslate
+EnvironmentFile=/usr/local/lib/python3.11/dist-packages/libretranslate/.env
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=1
+[Install]
+WantedBy=multi-user.target
+```
+
+Once saved, reload the daemon & start the service:
+
+```javascript
+systemctl daemon-reload
+systemctl start libretranslate.service
+systemctl enable libretranslate.service
+```
 
 ### Can I do batch translations?
 
