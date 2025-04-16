@@ -823,18 +823,11 @@ def create_app(args):
                       translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
                       alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
                 else:
-<<<<<<< HEAD
                     hypotheses = translator.hypotheses(q, num_alternatives + 1)
                     translated_text = unescape(improve_translation_formatting(q, hypotheses[0].value))
                     alternatives = filter_unique([unescape(improve_translation_formatting(q, hypotheses[i].value)) for i in range(1, len(hypotheses))], translated_text)
 
                 result = {"translatedText": restateitems(translated_text, itemflag)}
-=======
-                  translated_text = q # Cannot translate, send the original text back
-                  alternatives = []
-                
-                result = {"translatedText": translated_text}
->>>>>>> lt/main
 
                 if source_lang == "auto":
                     result["detectedLanguage"] = model2iso(detected_src_lang)
